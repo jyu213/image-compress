@@ -1,0 +1,67 @@
+#!/usr/bin/env node
+
+const fs = require('fs')
+const path = require('path')
+const program = require('commander')
+const imagemin = require('imagemin')
+const ora = require('ora')
+const glob = require('glob')
+
+program.version(require('../package.json').version)
+  .usage('[source image path]')
+  .option('-c --config <config>', 'image config file')
+  .action((dir) => {
+    if (typeof dir !== 'string') {
+      dir = 'src'
+    }
+
+    let userConfig
+    // load image config file
+    const defaultConfig = require('../config/.image.json')
+    const IMAGE_CONFIG = '.image.json'
+    const isConfigFile = fs.existsSync(path.resolve(IMAGE_CONFIG))
+    if (program.config || isConfigFile) {
+      try {
+        const configPath = isConfigFile ? IMAGE_CONFIG : program.config
+        userConfig = JSON.parse(fs.readFileSync(path.resolve(configPath), {encoding: 'utf-8'}))
+      } catch(err) {
+        console.log(`Error: get config file error, %s`, err)
+      }
+    }
+    const config = !!userConfig ? userConfig : defaultConfig
+    let plugins = Object.keys(config).map((key) => {
+      return require(`imagemin-${key}`)(config[key])
+    })
+
+    const spinner = ora('compress images...').start()
+    const imagePath = path.resolve(`${dir}/**/*.{jpg,png,gif,svg}`);
+
+    glob(imagePath, (err, files) => {
+      if (err) {
+        throw err
+      }
+
+      let failedFiles = []
+      const tasks = files.map((file) => {
+        return new Promise((resolve, reject) => {
+          imagemin([file], file.split('/').splice(0, file.split('/').length - 1).join('/'), {
+            plugins
+          }).then(() => {
+            resolve()
+          }).catch((err) => {
+            failedFiles.push(file)
+            resolve()
+            console.log(err)
+          })
+        })
+      })
+      Promise.all(tasks).then(() => {
+        spinner.stop()
+        console.log('compress images %s success.', files.length - failedFiles.length)
+        console.log('compress failed %s, files: %s', failedFiles.length, failedFiles.join('\n'))
+      }).catch((err) => {
+        spinner.stop()
+        throw err
+      })
+    })
+  }).parse(process.argv)

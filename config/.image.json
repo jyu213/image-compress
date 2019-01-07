@@ -1,0 +1,16 @@
+{
+  "mozjpeg": {
+    "progressive": true,
+    "quality": 75
+  },
+  "optipng": {
+    "enabled": false
+  },
+  "pngquant": {
+    "quality": "75-90",
+    "speed": 4
+  },
+  "gifsicle": {
+    "interlaced": false
+  }
+}
